@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -18,23 +19,43 @@ class MoodHistoryScreen extends StatefulWidget {
 
 class _MoodHistoryScreenState extends State<MoodHistoryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late AnimationController _animationController;
+  late Animation<double> _blurAnimation;
   
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    
+    _blurAnimation = Tween<double>(begin: 40.0, end: 20.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCirc,
+      ),
+    );
+    
+    _animationController.forward();
   }
   
   @override
   void dispose() {
     _tabController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
   
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text('Historique'),
         bottom: TabBar(
           controller: _tabController,
@@ -50,14 +71,101 @@ class _MoodHistoryScreenState extends State<MoodHistoryScreen> with SingleTicker
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
         ),
-        child: TabBarView(
-          controller: _tabController,
-          children: const [
-            _TimelineTab(),
-            _ChartTab(),
+        child: Stack(
+          children: [
+            // Cercles décoratifs en arrière-plan
+            _buildBackgroundCircles(),
+            
+            // Effet de flou sur l'arrière-plan
+            AnimatedBuilder(
+              animation: _blurAnimation,
+              builder: (context, child) {
+                return BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: _blurAnimation.value,
+                    sigmaY: _blurAnimation.value,
+                  ),
+                  child: Container(
+                    color: Colors.transparent,
+                  ),
+                );
+              },
+            ),
+            
+            // Contenu principal
+            SafeArea(
+              child: TabBarView(
+                controller: _tabController,
+                children: const [
+                  _TimelineTab(),
+                  _ChartTab(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+  
+  Widget _buildBackgroundCircles() {
+    return Stack(
+      children: [
+        // Cercle principal
+        Positioned(
+          top: -100,
+          right: -100,
+          child: Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.3),
+                  AppTheme.primaryColor.withOpacity(0.1),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Cercle secondaire
+        Positioned(
+          bottom: -80,
+          left: -80,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.secondaryColor.withOpacity(0.25),
+                  AppTheme.secondaryColor.withOpacity(0.05),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Cercle accent
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.4,
+          right: -40,
+          child: Container(
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.accentColor.withOpacity(0.2),
+                  AppTheme.accentColor.withOpacity(0.05),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -76,7 +184,7 @@ class _TimelineTab extends StatelessWidget {
     
     if (entries.isEmpty) {
       return Center(
-        child: GlassCard(
+        child: LiquidGlassContainer(
           padding: const EdgeInsets.all(AppTheme.spacingLarge),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -98,11 +206,36 @@ class _TimelineTab extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const MoodEntryScreen(),
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) => 
+                        const MoodEntryScreen(),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        var curve = Curves.easeInOut;
+                        var curveTween = CurveTween(curve: curve);
+                        
+                        var fadeAnimation = Tween<double>(
+                          begin: 0.0,
+                          end: 1.0,
+                        ).animate(
+                          animation.drive(curveTween),
+                        );
+                        
+                        return FadeTransition(
+                          opacity: fadeAnimation,
+                          child: child,
+                        );
+                      },
+                      transitionDuration: const Duration(milliseconds: 400),
                     ),
                   );
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.buttonRadius),
+                  ),
+                ),
                 child: const Text('Ajouter une entrée'),
               ),
             ],
@@ -152,11 +285,40 @@ class _MoodEntryCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppTheme.spacingMedium),
       child: GlassCard(
+        useLiquidEffect: true,
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => MoodEntryScreen(editEntry: entry),
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => 
+                MoodEntryScreen(editEntry: entry),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                var curve = Curves.easeInOut;
+                var curveTween = CurveTween(curve: curve);
+                
+                var fadeAnimation = Tween<double>(
+                  begin: 0.0,
+                  end: 1.0,
+                ).animate(
+                  animation.drive(curveTween),
+                );
+                
+                var scaleAnimation = Tween<double>(
+                  begin: 0.95,
+                  end: 1.0,
+                ).animate(
+                  animation.drive(curveTween),
+                );
+                
+                return FadeTransition(
+                  opacity: fadeAnimation,
+                  child: ScaleTransition(
+                    scale: scaleAnimation,
+                    child: child,
+                  ),
+                );
+              },
+              transitionDuration: const Duration(milliseconds: 400),
             ),
           );
         },
@@ -204,6 +366,13 @@ class _MoodEntryCard extends StatelessWidget {
                               padding: EdgeInsets.zero,
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 0.5,
+                                ),
+                              ),
                             );
                           }).toList(),
                         ),
@@ -302,7 +471,7 @@ class _ChartTabState extends State<_ChartTab> {
     
     if (entries.isEmpty) {
       return Center(
-        child: GlassCard(
+        child: LiquidGlassContainer(
           padding: const EdgeInsets.all(AppTheme.spacingLarge),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -330,7 +499,7 @@ class _ChartTabState extends State<_ChartTab> {
       child: Column(
         children: [
           // Sélecteur de période
-          GlassCard(
+          LiquidGlassContainer(
             padding: const EdgeInsets.symmetric(
               horizontal: AppTheme.spacingMedium,
               vertical: AppTheme.spacingSmall,
@@ -373,7 +542,7 @@ class _ChartTabState extends State<_ChartTab> {
           
           // Graphique
           Expanded(
-            child: GlassCard(
+            child: LiquidGlassContainer(
               padding: const EdgeInsets.all(AppTheme.spacingMedium),
               child: _buildChart(entries),
             ),
@@ -382,7 +551,7 @@ class _ChartTabState extends State<_ChartTab> {
           const SizedBox(height: AppTheme.spacingMedium),
           
           // Statistiques
-          GlassCard(
+          LiquidGlassContainer(
             padding: const EdgeInsets.all(AppTheme.spacingMedium),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,

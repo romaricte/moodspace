@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -20,12 +21,14 @@ class MoodEntryScreen extends StatefulWidget {
   State<MoodEntryScreen> createState() => _MoodEntryScreenState();
 }
 
-class _MoodEntryScreenState extends State<MoodEntryScreen> {
+class _MoodEntryScreenState extends State<MoodEntryScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _noteController = TextEditingController();
   double _moodValue = 0.5;
   File? _imageFile;
   final List<String> _selectedTags = [];
+  late AnimationController _animationController;
+  late Animation<double> _blurAnimation;
   
   // Liste de tags prédéfinis
   final List<String> _availableTags = [
@@ -36,6 +39,21 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Animation pour l'effet de flou
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    
+    _blurAnimation = Tween<double>(begin: 40.0, end: 20.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCirc,
+      ),
+    );
+    
+    _animationController.forward();
     
     // Si on édite une entrée existante, initialiser les valeurs
     if (widget.editEntry != null) {
@@ -53,6 +71,7 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> {
   @override
   void dispose() {
     _noteController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
   
@@ -131,7 +150,10 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(widget.editEntry != null 
             ? 'Modifier l\'entrée' 
             : 'Nouvelle entrée'),
@@ -147,192 +169,288 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> {
         decoration: const BoxDecoration(
           gradient: AppTheme.backgroundGradient,
         ),
-        child: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(AppTheme.spacingMedium),
-              children: [
-                // Sélecteur d'humeur
-                GlassCard(
-                  padding: const EdgeInsets.all(AppTheme.spacingLarge),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Comment vous sentez-vous ?',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: AppTheme.spacingMedium),
-                      MoodSlider(
-                        initialValue: _moodValue,
-                        onChanged: (value) {
-                          setState(() {
-                            _moodValue = value;
-                          });
-                        },
-                      ),
-                    ],
+        child: Stack(
+          children: [
+            // Cercles décoratifs en arrière-plan
+            _buildBackgroundCircles(),
+            
+            // Effet de flou sur l'arrière-plan
+            AnimatedBuilder(
+              animation: _blurAnimation,
+              builder: (context, child) {
+                return BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: _blurAnimation.value,
+                    sigmaY: _blurAnimation.value,
                   ),
-                ),
-                
-                const SizedBox(height: AppTheme.spacingMedium),
-                
-                // Champ de texte pour les notes
-                GlassCard(
-                  padding: const EdgeInsets.all(AppTheme.spacingLarge),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Journal',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: AppTheme.spacingMedium),
-                      TextFormField(
-                        controller: _noteController,
-                        maxLines: 5,
-                        decoration: InputDecoration(
-                          hintText: 'Décrivez votre journée, vos émotions...',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                          filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                            borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.3),
-                              width: 1.0,
+                  child: Container(
+                    color: Colors.transparent,
+                  ),
+                );
+              },
+            ),
+            
+            // Contenu principal
+            SafeArea(
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(AppTheme.spacingMedium),
+                  children: [
+                    // Sélecteur d'humeur
+                    LiquidGlassContainer(
+                      padding: const EdgeInsets.all(AppTheme.spacingLarge),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Comment vous sentez-vous ?',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: AppTheme.spacingMedium),
-                
-                // Sélection d'image
-                GlassCard(
-                  padding: const EdgeInsets.all(AppTheme.spacingLarge),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Ajouter une image',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: AppTheme.spacingMedium),
-                      if (_imageFile != null) ...[
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(AppTheme.borderRadius),
-                          child: Image.file(
-                            _imageFile!,
-                            fit: BoxFit.cover,
-                            height: 200,
-                            width: double.infinity,
+                          const SizedBox(height: AppTheme.spacingMedium),
+                          MoodSlider(
+                            initialValue: _moodValue,
+                            onChanged: (value) {
+                              setState(() {
+                                _moodValue = value;
+                              });
+                            },
                           ),
-                        ),
-                        const SizedBox(height: AppTheme.spacingMedium),
-                        Center(
-                          child: TextButton.icon(
-                            onPressed: _removeImage,
-                            icon: const Icon(Icons.delete_outline, color: Colors.white70),
-                            label: Text(
-                              'Supprimer',
-                              style: TextStyle(color: Colors.white70),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: AppTheme.spacingMedium),
+                    
+                    // Champ de texte pour les notes
+                    LiquidGlassContainer(
+                      padding: const EdgeInsets.all(AppTheme.spacingLarge),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Journal',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        ),
-                      ] else ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            GlassButton(
-                              onPressed: _pickImage,
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.photo_library, color: Colors.white),
-                                  const SizedBox(width: AppTheme.spacingSmall),
-                                  const Text('Galerie', style: TextStyle(color: Colors.white)),
-                                ],
+                          const SizedBox(height: AppTheme.spacingMedium),
+                          TextFormField(
+                            controller: _noteController,
+                            maxLines: 5,
+                            decoration: InputDecoration(
+                              hintText: 'Décrivez votre journée, vos émotions...',
+                              hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.1),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1.0,
+                                ),
                               ),
                             ),
-                            GlassButton(
-                              onPressed: _takePhoto,
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.camera_alt, color: Colors.white),
-                                  const SizedBox(width: AppTheme.spacingSmall),
-                                  const Text('Caméra', style: TextStyle(color: Colors.white)),
-                                ],
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: AppTheme.spacingMedium),
+                    
+                    // Sélection d'image
+                    LiquidGlassContainer(
+                      padding: const EdgeInsets.all(AppTheme.spacingLarge),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ajouter une image',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: AppTheme.spacingMedium),
+                          if (_imageFile != null) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(AppTheme.borderRadius),
+                              child: Image.file(
+                                _imageFile!,
+                                fit: BoxFit.cover,
+                                height: 200,
+                                width: double.infinity,
                               ),
+                            ),
+                            const SizedBox(height: AppTheme.spacingMedium),
+                            Center(
+                              child: TextButton.icon(
+                                onPressed: _removeImage,
+                                icon: const Icon(Icons.delete_outline, color: Colors.white70),
+                                label: Text(
+                                  'Supprimer',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                GlassButton(
+                                  onPressed: _pickImage,
+                                  useLiquidEffect: true,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.photo_library, color: Colors.white),
+                                      const SizedBox(width: AppTheme.spacingSmall),
+                                      const Text('Galerie', style: TextStyle(color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
+                                GlassButton(
+                                  onPressed: _takePhoto,
+                                  useLiquidEffect: true,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.camera_alt, color: Colors.white),
+                                      const SizedBox(width: AppTheme.spacingSmall),
+                                      const Text('Caméra', style: TextStyle(color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: AppTheme.spacingMedium),
-                
-                // Tags
-                GlassCard(
-                  padding: const EdgeInsets.all(AppTheme.spacingLarge),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tags',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: AppTheme.spacingMedium),
-                      Wrap(
-                        spacing: AppTheme.spacingSmall,
-                        runSpacing: AppTheme.spacingSmall,
-                        children: _availableTags.map((tag) {
-                          final isSelected = _selectedTags.contains(tag);
-                          return FilterChip(
-                            selected: isSelected,
-                            label: Text(tag),
-                            onSelected: (_) => _toggleTag(tag),
-                            backgroundColor: Colors.white.withOpacity(0.1),
-                            selectedColor: AppTheme.primaryColor.withOpacity(0.7),
-                            checkmarkColor: Colors.white,
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white70,
+                    ),
+                    
+                    const SizedBox(height: AppTheme.spacingMedium),
+                    
+                    // Tags
+                    LiquidGlassContainer(
+                      padding: const EdgeInsets.all(AppTheme.spacingLarge),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tags',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          const SizedBox(height: AppTheme.spacingMedium),
+                          Wrap(
+                            spacing: AppTheme.spacingSmall,
+                            runSpacing: AppTheme.spacingSmall,
+                            children: _availableTags.map((tag) {
+                              final isSelected = _selectedTags.contains(tag);
+                              return FilterChip(
+                                selected: isSelected,
+                                label: Text(tag),
+                                onSelected: (_) => _toggleTag(tag),
+                                backgroundColor: Colors.white.withOpacity(0.1),
+                                selectedColor: AppTheme.primaryColor.withOpacity(0.7),
+                                checkmarkColor: Colors.white,
+                                labelStyle: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white70,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  side: BorderSide(
+                                    color: isSelected 
+                                        ? Colors.white.withOpacity(0.5) 
+                                        : Colors.white.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    
+                    const SizedBox(height: AppTheme.spacingLarge),
+                  ],
                 ),
-                
-                const SizedBox(height: AppTheme.spacingLarge),
-              ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildBackgroundCircles() {
+    return Stack(
+      children: [
+        // Cercle principal
+        Positioned(
+          top: -100,
+          right: -100,
+          child: Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.primaryColor.withOpacity(0.3),
+                  AppTheme.primaryColor.withOpacity(0.1),
+                ],
+              ),
             ),
           ),
         ),
-      ),
+        // Cercle secondaire
+        Positioned(
+          bottom: -80,
+          left: -80,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.secondaryColor.withOpacity(0.25),
+                  AppTheme.secondaryColor.withOpacity(0.05),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Cercle accent
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.4,
+          right: -40,
+          child: Container(
+            width: 150,
+            height: 150,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  AppTheme.accentColor.withOpacity(0.2),
+                  AppTheme.accentColor.withOpacity(0.05),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 } 

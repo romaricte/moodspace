@@ -9,18 +9,54 @@ import '../shared/glass_container.dart';
 import 'quote_card.dart';
 import '../mood_entry/mood_entry_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _blurAnimation;
+  
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    
+    _blurAnimation = Tween<double>(begin: 50.0, end: 30.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCirc,
+      ),
+    );
+    
+    _animationController.forward();
+  }
+  
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _HomeContent(),
+      body: _HomeContent(blurAnimation: _blurAnimation),
     );
   }
 }
 
 class _HomeContent extends StatelessWidget {
+  final Animation<double> blurAnimation;
+  
+  const _HomeContent({required this.blurAnimation});
+  
   @override
   Widget build(BuildContext context) {
     final quoteProvider = Provider.of<QuoteProvider>(context);
@@ -34,38 +70,23 @@ class _HomeContent extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Cercles décoratifs en arrière-plan
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.primaryColor.withOpacity(0.2),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -80,
-            left: -80,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.secondaryColor.withOpacity(0.15),
-              ),
-            ),
-          ),
+          // Cercles décoratifs en arrière-plan avec animation
+          _buildAnimatedBackgroundCircles(),
           
           // Effet de flou sur l'arrière-plan
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-            child: Container(
-              color: Colors.transparent,
-            ),
+          AnimatedBuilder(
+            animation: blurAnimation,
+            builder: (context, child) {
+              return BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: blurAnimation.value,
+                  sigmaY: blurAnimation.value,
+                ),
+                child: Container(
+                  color: Colors.transparent,
+                ),
+              );
+            },
           ),
           
           // Contenu principal
@@ -93,46 +114,78 @@ class _HomeContent extends StatelessWidget {
                   
                   const SizedBox(height: AppTheme.spacingXLarge),
                   
-                  // Citation du jour
+                  // Citation du jour avec effet liquid glass
                   AnimatedQuoteCard(
                     quote: quote,
                     onRefresh: () => quoteProvider.getNewRandomQuote(),
+                    useLiquidEffect: true,
                   ),
                   
                   const Spacer(),
                   
                   // Bouton pour ajouter une humeur
                   Center(
-                    child: GlassButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const MoodEntryScreen(),
-                          ),
-                        );
-                      },
+                    child: LiquidGlassContainer(
+                      borderRadius: AppTheme.buttonRadius,
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppTheme.spacingXLarge,
                         vertical: AppTheme.spacingMedium,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.add_reaction_outlined,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                          const SizedBox(width: AppTheme.spacingMedium),
-                          Text(
-                            'Noter mon humeur',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder: (context, animation, secondaryAnimation) => 
+                                const MoodEntryScreen(),
+                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                var curve = Curves.easeInOut;
+                                var curveTween = CurveTween(curve: curve);
+                                
+                                var fadeAnimation = Tween<double>(
+                                  begin: 0.0,
+                                  end: 1.0,
+                                ).animate(
+                                  animation.drive(curveTween),
+                                );
+                                
+                                var scaleAnimation = Tween<double>(
+                                  begin: 0.95,
+                                  end: 1.0,
+                                ).animate(
+                                  animation.drive(curveTween),
+                                );
+                                
+                                return FadeTransition(
+                                  opacity: fadeAnimation,
+                                  child: ScaleTransition(
+                                    scale: scaleAnimation,
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              transitionDuration: const Duration(milliseconds: 400),
                             ),
-                          ),
-                        ],
+                          );
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.add_reaction_outlined,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                            const SizedBox(width: AppTheme.spacingMedium),
+                            Text(
+                              'Noter mon humeur',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -143,6 +196,7 @@ class _HomeContent extends StatelessWidget {
                   if (!moodProvider.isLoading && moodProvider.entries.isNotEmpty)
                     GlassCard(
                       padding: const EdgeInsets.all(AppTheme.spacingMedium),
+                      useLiquidEffect: true,
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
@@ -168,6 +222,72 @@ class _HomeContent extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+  
+  Widget _buildAnimatedBackgroundCircles() {
+    return AnimatedBuilder(
+      animation: blurAnimation,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            // Cercle principal
+            Positioned(
+              top: -100,
+              right: -100,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.primaryColor.withOpacity(0.3),
+                      AppTheme.primaryColor.withOpacity(0.1),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Cercle secondaire
+            Positioned(
+              bottom: -80,
+              left: -80,
+              child: Container(
+                width: 250,
+                height: 250,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.secondaryColor.withOpacity(0.25),
+                      AppTheme.secondaryColor.withOpacity(0.05),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Cercle accent
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.4,
+              right: -40,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppTheme.accentColor.withOpacity(0.2),
+                      AppTheme.accentColor.withOpacity(0.05),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

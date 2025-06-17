@@ -6,61 +6,72 @@ import '../shared/glass_container.dart';
 class QuoteCard extends StatelessWidget {
   final Quote quote;
   final VoidCallback? onRefresh;
+  final bool useLiquidEffect;
   
   const QuoteCard({
     super.key,
     required this.quote,
     this.onRefresh,
+    this.useLiquidEffect = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(AppTheme.spacingLarge),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.format_quote,
-                color: Colors.white70,
-                size: 28,
-              ),
-              const Spacer(),
-              if (onRefresh != null)
-                IconButton(
-                  onPressed: onRefresh,
-                  icon: const Icon(
-                    Icons.refresh_rounded,
-                    color: Colors.white70,
-                  ),
-                  tooltip: 'Nouvelle citation',
-                ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.spacing),
-          Text(
-            quote.text,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white,
-                  fontStyle: FontStyle.italic,
-                  height: 1.5,
-                ),
-          ),
-          const SizedBox(height: AppTheme.spacingMedium),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '— ${quote.author}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w500,
-                  ),
+    return useLiquidEffect 
+      ? LiquidGlassContainer(
+          padding: const EdgeInsets.all(AppTheme.spacingLarge),
+          child: _buildQuoteContent(context),
+        )
+      : GlassCard(
+          padding: const EdgeInsets.all(AppTheme.spacingLarge),
+          child: _buildQuoteContent(context),
+        );
+  }
+  
+  Widget _buildQuoteContent(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.format_quote,
+              color: Colors.white70,
+              size: 28,
             ),
+            const Spacer(),
+            if (onRefresh != null)
+              IconButton(
+                onPressed: onRefresh,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Colors.white70,
+                ),
+                tooltip: 'Nouvelle citation',
+              ),
+          ],
+        ),
+        const SizedBox(height: AppTheme.spacing),
+        Text(
+          quote.text,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Colors.white,
+                fontStyle: FontStyle.italic,
+                height: 1.5,
+              ),
+        ),
+        const SizedBox(height: AppTheme.spacingMedium),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '— ${quote.author}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -70,12 +81,14 @@ class AnimatedQuoteCard extends StatelessWidget {
   final Quote quote;
   final VoidCallback? onRefresh;
   final Duration duration;
+  final bool useLiquidEffect;
   
   const AnimatedQuoteCard({
     super.key,
     required this.quote,
     this.onRefresh,
     this.duration = const Duration(milliseconds: 800),
+    this.useLiquidEffect = false,
   });
 
   @override
@@ -96,6 +109,7 @@ class AnimatedQuoteCard extends StatelessWidget {
       child: QuoteCard(
         quote: quote,
         onRefresh: onRefresh,
+        useLiquidEffect: useLiquidEffect,
       ),
     );
   }
