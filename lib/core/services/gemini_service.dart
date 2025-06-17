@@ -24,7 +24,7 @@ class GeminiService {
     final apiKey = _apiKey;
     if (apiKey != null && apiKey.isNotEmpty) {
       _model = GenerativeModel(
-        model: 'gemini-1.5-pro',
+        model: 'gemini-1.5-flash',
         apiKey: apiKey,
         generationConfig: GenerationConfig(
           temperature: 0.7,
