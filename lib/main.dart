@@ -2,18 +2,29 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/providers/mood_provider.dart';
 import 'core/providers/quote_provider.dart';
+import 'core/providers/theme_provider.dart';
 import 'core/theme/app_theme.dart';
 import 'features/home/home_screen.dart';
 import 'features/mood_history/mood_history_screen.dart';
 import 'features/splash/splash_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Charger les variables d'environnement
+  try {
+    await dotenv.load(fileName: ".env");
+    debugPrint("Fichier .env chargé avec succès");
+  } catch (e) {
+    debugPrint("Erreur lors du chargement du fichier .env: $e");
+    debugPrint("L'application fonctionnera sans l'API Gemini");
+  }
+  
   // Forcer l'orientation portrait
-  SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
@@ -34,14 +45,24 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => MoodProvider()),
-        ChangeNotifierProvider(create: (_) => QuoteProvider()),
+        ChangeNotifierProvider(
+          create: (_) => QuoteProvider(),
+          lazy: false,
+        ),
       ],
-      child: MaterialApp(
-        title: 'MoodSpace',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme(),
-        home: const SplashScreen(nextScreen: MainScreen()),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'MoodSpace',
+            theme: themeProvider.lightTheme,
+            darkTheme: themeProvider.darkTheme,
+            themeMode: themeProvider.themeMode,
+            debugShowCheckedModeBanner: false,
+            home: const SplashScreen(nextScreen: HomeScreen()),
+          );
+        },
       ),
     );
   }

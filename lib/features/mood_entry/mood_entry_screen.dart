@@ -3,11 +3,14 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 import '../../core/models/mood_entry.dart';
 import '../../core/providers/mood_provider.dart';
+import '../../core/providers/quote_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../shared/glass_container.dart';
 import 'mood_slider.dart';
+import '../home/home_screen.dart';
 
 class MoodEntryScreen extends StatefulWidget {
   final MoodEntry? editEntry;
@@ -29,6 +32,7 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> with SingleTickerProv
   final List<String> _selectedTags = [];
   late AnimationController _animationController;
   late Animation<double> _blurAnimation;
+  bool _isSaving = false;
   
   // Liste de tags prédéfinis
   final List<String> _availableTags = [
@@ -124,12 +128,17 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> with SingleTickerProv
   }
   
   // Méthode pour sauvegarder l'entrée d'humeur
-  void _saveEntry() {
+  Future<void> _saveEntry() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isSaving = true;
+      });
+      
       final moodProvider = Provider.of<MoodProvider>(context, listen: false);
+      final quoteProvider = Provider.of<QuoteProvider>(context, listen: false);
       
       final entry = MoodEntry(
-        id: widget.editEntry?.id,
+        id: widget.editEntry?.id ?? const Uuid().v4(),
         date: DateTime.now(),
         moodScore: _moodValue,
         note: _noteController.text.isNotEmpty ? _noteController.text : null,
@@ -138,12 +147,34 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> with SingleTickerProv
       );
       
       if (widget.editEntry != null) {
-        moodProvider.updateEntry(entry);
+        await moodProvider.updateEntry(entry);
       } else {
-        moodProvider.addEntry(entry);
+        await moodProvider.addEntry(entry);
       }
       
-      Navigator.pop(context);
+      // Générer une citation inspirante adaptée à l'humeur
+      await quoteProvider.generateQuoteForMood(entry);
+      
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+        
+        // Retourner à l'écran d'accueil
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => const HomeScreen(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              const begin = Offset(0.0, 1.0);
+              const end = Offset.zero;
+              const curve = Curves.easeInOutCubic;
+              var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              var offsetAnimation = animation.drive(tween);
+              return SlideTransition(position: offsetAnimation, child: child);
+            },
+          ),
+        );
+      }
     }
   }
   
@@ -158,11 +189,23 @@ class _MoodEntryScreenState extends State<MoodEntryScreen> with SingleTickerProv
             ? 'Modifier l\'entrée' 
             : 'Nouvelle entrée'),
         actions: [
-          IconButton(
-            onPressed: _saveEntry,
-            icon: const Icon(Icons.check),
-            tooltip: 'Enregistrer',
-          ),
+          _isSaving
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.0,
+                    ),
+                  ),
+                )
+              : IconButton(
+                  onPressed: _saveEntry,
+                  icon: const Icon(Icons.check),
+                  tooltip: 'Enregistrer',
+                ),
         ],
       ),
       body: Container(
