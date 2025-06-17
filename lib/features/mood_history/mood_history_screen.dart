@@ -17,7 +17,7 @@ class MoodHistoryScreen extends StatefulWidget {
   State<MoodHistoryScreen> createState() => _MoodHistoryScreenState();
 }
 
-class _MoodHistoryScreenState extends State<MoodHistoryScreen> with SingleTickerProviderStateMixin {
+class _MoodHistoryScreenState extends State<MoodHistoryScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _animationController;
   late Animation<double> _blurAnimation;
